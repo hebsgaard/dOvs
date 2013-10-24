@@ -1,0 +1,115 @@
+signature SEMANT =
+sig
+  val transProg: Absyn.exp -> Types.ty
+end
+
+structure Semant :> SEMANT =
+struct
+
+structure S = Symbol
+structure A = Absyn
+structure E = Env
+structure Ty = Types
+structure PT = PrintTypes
+
+val err = ErrorMsg.error
+
+fun lookupTy tenv sym pos =
+    let
+        val tyOpt = S.look (tenv, sym)
+    in
+        Ty.ERROR (* TODO *)
+    end
+
+(* NB: Some function names adjusted to use CamelCase more consistently.
+ * For example: 'actual_ty' was renamed to 'actualTy' *)
+
+fun actualTy (Ty.NAME (s, ty)) pos =
+    Ty.ERROR (* TODO *)
+  | actualTy t _ = t
+
+fun checkInt (ty, pos, msg) =
+    case ty of
+        Ty.INT => ()
+      | Ty.ERROR => ()
+      | _ => err pos ("INT required" ^ msg ^ ", " ^
+                      PT.asString ty ^ " provided")
+
+fun checkUnit (ty, pos, msg) = err pos "TODO"
+
+fun checkAssignable (declared: Ty.ty, assigned: Ty.ty, pos, msg) =
+    let
+        val aDeclared = actualTy declared pos
+        val aAssigned = actualTy assigned pos
+    in
+        () (* TODO *)
+    end
+
+fun transTy (tenv, t) = Ty.ERROR (* TODO *)
+
+fun transExp (venv, tenv) =
+    let
+        val TODO = {exp = (), ty = Ty.ERROR}
+
+        fun trexp (A.NilExp) = {exp = (), ty = Ty.NIL}
+          | trexp (A.VarExp var) = TODO
+          | trexp (A.IntExp i) = TODO
+          | trexp (A.StringExp (str, pos)) = TODO
+          | trexp (A.OpExp {left, oper, right, pos}) = TODO
+          | trexp (A.CallExp {func, args, pos}) = TODO
+          | trexp (A.IfExp {test, thn, els, pos}) = TODO
+          | trexp (A.WhileExp {test, body, pos}) = TODO
+	  | trexp (A.RecordExp {fields, typ, pos}) = TODO
+          | trexp (A.SeqExp []) = TODO
+          | trexp (A.SeqExp (aexps as (aexp'::aexps'))) = TODO
+          | trexp (A.AssignExp {var, exp, pos}) = TODO
+          | trexp (A.ForExp {var, escape, lo, hi, body, pos}) = TODO
+          | trexp (A.BreakExp pos) = TODO
+          | trexp (A.LetExp {decls, body, pos}) = 
+	    let
+		val {venv=venv', tenv=tenv'} = transDecs (venv, tenv, decls)
+	    in
+		transExp (venv', tenv') body
+	    end
+          | trexp (A.ArrayExp {typ, size, init, pos}) = TODO
+
+        and trvar (A.SimpleVar (id, pos)) = TODO
+          | trvar (A.FieldVar (var, id, pos)) = TODO
+          | trvar (A.SubscriptVar (var, exp, pos)) = TODO
+    in
+        trexp
+    end
+
+and transDec ( venv, tenv
+             , A.VarDec {name, escape, typ = NONE, init, pos}) =
+    {tenv = tenv, venv = venv} (* TODO *)
+
+  | transDec ( venv, tenv
+             , A.VarDec {name, escape, typ = SOME (s, pos), init, pos=pos1}) =
+    {tenv = tenv, venv = venv} (* TODO *)
+
+  | transDec (venv, tenv, A.TypeDec tydecls) =
+    {tenv = tenv, venv = venv} (* TODO *)
+
+  | transDec (venv, tenv, A.FunctionDec fundecls) =
+    {tenv = tenv, venv = venv} (* TODO *)
+
+and transDecs (venv, tenv, decls) =
+    case decls 
+     of [] => {venv = venv, tenv = tenv}
+      | (d::ds) =>
+        let
+            val {venv = venv', tenv = tenv'} = transDec (venv, tenv, d)
+        in
+            transDecs (venv', tenv', ds)
+        end
+
+fun transProg absyn =
+    let
+        val {exp=_,ty} = transExp (Env.baseVenv, Env.baseTenv) absyn
+    in
+        ty
+    end
+
+end (* Semant *)
+
