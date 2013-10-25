@@ -124,7 +124,12 @@ fun transExp (venv, tenv) =
           | trexp (A.AssignExp {var, exp, pos}) = TODO
           | trexp (A.ForExp {var, escape, lo, hi, body, pos}) = TODO
           | trexp (A.BreakExp pos) = TODO
-          | trexp (A.LetExp {decls, body, pos}) = TODO
+          | trexp (A.LetExp {decls, body, pos}) =
+	    let
+                val {venv=venv', tenv=tenv'} = transDecs (venv, tenv, decls)
+            in
+                transExp (venv', tenv') body
+            end
           | trexp (A.ArrayExp {typ, size, init, pos}) = TODO
 
         and trvar (A.SimpleVar (id, pos)) = TODO
