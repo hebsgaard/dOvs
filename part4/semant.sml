@@ -14,6 +14,11 @@ structure PT = PrintTypes
 
 val err = ErrorMsg.error
 
+(* Nesting of while- and for- loops, so we know if a break is allowed. *)
+val nesting = ref 0
+fun incNesting() = nesting := !nesting + 1
+fun decNesting() = nesting := !nesting - 1
+
 fun lookupTy tenv sym pos =
     let
         val tyOpt = S.look (tenv, sym)
@@ -123,9 +128,10 @@ fun transExp (venv, tenv) =
 			 end)
           | trexp (A.WhileExp {test, body, pos}) = 
 	    let 
-		(* Maaske skal man holde oeje med nesting af while loekker? *)
+		val _ = incNesting()
 		val test' = trexp test
 		val body' = trexp body
+		val _ = decNesting()
 	    in
 		(checkInt(test', pos);
 		 checkUnit(body', pos);
@@ -134,9 +140,24 @@ fun transExp (venv, tenv) =
           | trexp (A.RecordExp {fields, typ, pos}) = TODO
           | trexp (A.SeqExp []) = TODO
           | trexp (A.SeqExp (aexps as (aexp'::aexps'))) = TODO
-          | trexp (A.AssignExp {var, exp, pos}) = TODO
+          | trexp (A.AssignExp {var, exp, pos}) = 
+	    let 
+		val var' = trvar var
+		val exp' = trexp exp
+	    in
+		if #ty var' = #ty exp'
+		then
+		    {exp = (), ty = Ty.UNIT}
+		else
+		    (err pos "mismatch of types in assignment"; {exp = (), ty = Ty.ERROR})
+	    end
           | trexp (A.ForExp {var, escape, lo, hi, body, pos}) = TODO
-          | trexp (A.BreakExp pos) = TODO
+          | trexp (A.BreakExp pos) = 
+	    if !nesting > 0
+	    then 
+		{exp = (), ty = Ty.UNIT}
+	    else
+		(err pos "break expression not inside while/for loop"; {exp = (), ty = Ty.UNIT})
           | trexp (A.LetExp {decls, body, pos}) =
 	    let
                 val {venv=venv', tenv=tenv'} = transDecs (venv, tenv, decls)
