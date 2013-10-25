@@ -41,7 +41,11 @@ fun checkString ({exp, ty}, pos) =
                   | _ => err pos ("String required" ^ ", " ^
                                  PT.asString ty^ "provided")
 
-fun checkUnit (ty, pos, msg) = err pos "TODO"
+fun checkUnit ({exp, ty}, pos) =
+    case ty of 
+	Ty.UNIT => ()
+      | Ty.ERROR => ()
+      | _  => err pos ("Unit required, " ^ PT.asString ty ^ " provided")  
 
 fun checkAssignable (declared: Ty.ty, assigned: Ty.ty, pos, msg) =
     let
@@ -62,7 +66,7 @@ fun transExp (venv, tenv) =
           | trexp (A.IntExp i) = {exp = (), ty = Ty.INT}
           | trexp (A.StringExp (str, pos)) = {exp = (), ty = Ty.STRING}
           | trexp (A.OpExp {left, oper, right, pos}) = 
- if oper = A.PlusOp 
+ 	    if oper = A.PlusOp 
                orelse oper = A.MinusOp
                orelse oper = A.TimesOp
                orelse oper = A.DivideOp
@@ -99,12 +103,12 @@ fun transExp (venv, tenv) =
           | trexp (A.CallExp {func, args, pos}) = TODO
           | trexp (A.IfExp {test, thn, els, pos}) =
 	    (case els of NONE=> 
-                         let
-                             val test' = trexp test
-                             val thn' = trexp thn
-                         in
-                             (checkInt(test', pos);
-                              {exp = (), ty = #ty thn'})
+	        let
+	             val test' = trexp test
+                     val thn' = trexp thn
+                in
+                    (checkInt(test', pos);
+                    {exp = (), ty = #ty thn'})
                          end
 		       | SOME els=> 
 			 let
@@ -117,7 +121,16 @@ fun transExp (venv, tenv) =
 			      then {exp = (), ty = #ty thn'}
 			      else {exp = (), ty = Ty.ERROR})
 			 end)
-          | trexp (A.WhileExp {test, body, pos}) = TODO
+          | trexp (A.WhileExp {test, body, pos}) = 
+	    let 
+		(* Maaske skal man holde oeje med nesting af while loekker? *)
+		val test' = trexp test
+		val body' = trexp body
+	    in
+		(checkInt(test', pos);
+		 checkUnit(body', pos);
+		 {exp = (), ty = Ty.UNIT})
+	    end
           | trexp (A.RecordExp {fields, typ, pos}) = TODO
           | trexp (A.SeqExp []) = TODO
           | trexp (A.SeqExp (aexps as (aexp'::aexps'))) = TODO
@@ -151,7 +164,7 @@ and transDec ( venv, tenv
     {tenv = tenv, venv = venv} (* TODO *)
 
   | transDec (venv, tenv, A.FunctionDec fundecls) =
-    {tenv = tenv, venv = venv} (* TODO *)
+     {tenv = tenv, venv = venv} (* TODO *)
 
 and transDecs (venv, tenv, decls) =
     case decls 
