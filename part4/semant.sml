@@ -29,16 +29,17 @@ fun actualTy (Ty.NAME (s, ty)) pos =
   | actualTy t _ = t
 
 fun checkInt ({exp, ty}, pos) =
-    case ty of Ty.INT => ()
+    case ty of
+        Ty.INT => ()
       | Ty.ERROR => ()
       | _ => err pos ("INT required" ^ ", " ^
                       PT.asString ty ^ " provided")
 
 fun checkString ({exp, ty}, pos) = 
     case ty of Ty.STRING => ()
-		  | Ty.ERROR =>() 
-		  | _ => err pos ("String required" ^ ", " ^
-				 PT.asString ty^ "provided")
+                  | Ty.ERROR =>() 
+                  | _ => err pos ("String required" ^ ", " ^
+                                 PT.asString ty^ "provided")
 
 fun checkUnit (ty, pos, msg) = err pos "TODO"
 
@@ -58,82 +59,80 @@ fun transExp (venv, tenv) =
 
         fun trexp (A.NilExp) = {exp = (), ty = Ty.NIL}
           | trexp (A.VarExp var) = trvar var
-          | trexp (A.IntExp i) = {exp = () , ty = Ty.INT}
+          | trexp (A.IntExp i) = {exp = (), ty = Ty.INT}
           | trexp (A.StringExp (str, pos)) = {exp = (), ty = Ty.STRING}
-          | trexp (A.OpExp {left, oper, right, pos}) =
-	    if oper = A.PlusOp 
-	       orelse oper = A.MinusOp
-	       orelse oper = A.TimesOp
-	       orelse oper = A.DivideOp
-	    then
-		let
-		    val left' = trexp left
-		    val right' = trexp right
-		in
-		    (checkInt (left', pos); 
-		     checkInt(right', pos);
-		     {exp = (), ty=Ty.INT})
-		end
-	    else if oper = A.EqOp
-		    orelse oper = A.NeqOp
-		    orelse oper = A.LtOp
-		    orelse oper = A.LeOp
-		    orelse oper = A.GtOp
-		    orelse oper = A.GeOp
-	    then
-		let 
-		    val left' = trexp left
-		    val right' = trexp right
-		in
-		    (*Her er der redundans*)
-		    case #ty left' of Ty.INT => (checkInt (left', pos);
-						 checkInt (right', pos);
-						 {exp = (), ty = Ty.INT})
-				    | Ty.STRING => (checkString (left', pos);
-						    checkString(right', pos);
-						    {exp = (), ty = Ty.STRING})
-				    | _ => {exp = (), ty = Ty.ERROR}  
-		end
-	    else {exp = (), ty = Ty.ERROR}
+          | trexp (A.OpExp {left, oper, right, pos}) = 
+ if oper = A.PlusOp 
+               orelse oper = A.MinusOp
+               orelse oper = A.TimesOp
+               orelse oper = A.DivideOp
+            then
+                let
+                    val left' = trexp left
+                    val right' = trexp right
+                in
+                    (checkInt (left', pos); 
+                     checkInt(right', pos);
+                     {exp = (), ty=Ty.INT})
+                end
+            else if oper = A.EqOp
+                    orelse oper = A.NeqOp
+                    orelse oper = A.LtOp
+                    orelse oper = A.LeOp
+                    orelse oper = A.GtOp
+                    orelse oper = A.GeOp
+            then
+                let 
+                    val left' = trexp left
+                    val right' = trexp right
+                in
+                    (*Her er der redundans*)
+                    case #ty left' of Ty.INT => (checkInt (left', pos);
+                                                 checkInt (right', pos);
+                                                 {exp = (), ty = Ty.INT})
+                                    | Ty.STRING => (checkString (left', pos);
+                                                    checkString(right', pos);
+                                                    {exp = (), ty = Ty.STRING})
+                                    | _ => {exp = (), ty = Ty.ERROR}  
+                end
+            else {exp = (), ty = Ty.ERROR}
           | trexp (A.CallExp {func, args, pos}) = TODO
-          | trexp (A.IfExp {test, thn, els, pos}) = 
-	    case els of NONE => 
-			let
-			    val test' = trexp test
-			    val thn' = trexp thn
-			in
-			    (checkInt(test', pos);
-			     {exp = (), ty = #ty thn'})
-			end
-	     | SOME => 
-	       let
-		   val test' = trexp test
-		   val thn' = trexp thn
-		   val els' = trexp els
-	       in
-		   (checkInt(test', pos);
-		    if (# ty thn' == #ty els')
-		    then {exp = (), ty = #ty thn'}
-		    else {exp = (), ty = Ty.ERROR})
-	       end
+          | trexp (A.IfExp {test, thn, els, pos}) =
+	    (case els of NONE=> 
+                         let
+                             val test' = trexp test
+                             val thn' = trexp thn
+                         in
+                             (checkInt(test', pos);
+                              {exp = (), ty = #ty thn'})
+                         end
+		       | SOME els=> 
+			 let
+			     val test' = trexp test
+			     val thn' = trexp thn
+			     val els' = trexp els
+			 in
+			     (checkInt(test', pos);
+			      if (# ty thn' = #ty els')
+			      then {exp = (), ty = #ty thn'}
+			      else {exp = (), ty = Ty.ERROR})
+			 end)
           | trexp (A.WhileExp {test, body, pos}) = TODO
-	  | trexp (A.RecordExp {fields, typ, pos}) = TODO
+          | trexp (A.RecordExp {fields, typ, pos}) = TODO
           | trexp (A.SeqExp []) = TODO
           | trexp (A.SeqExp (aexps as (aexp'::aexps'))) = TODO
           | trexp (A.AssignExp {var, exp, pos}) = TODO
           | trexp (A.ForExp {var, escape, lo, hi, body, pos}) = TODO
           | trexp (A.BreakExp pos) = TODO
-          | trexp (A.LetExp {decls, body, pos}) = 
-	    let
-		val {venv=venv', tenv=tenv'} = transDecs (venv, tenv, decls)
-	    in
-		transExp (venv', tenv') body
-	    end
+          | trexp (A.LetExp {decls, body, pos}) = TODO
           | trexp (A.ArrayExp {typ, size, init, pos}) = TODO
 
         and trvar (A.SimpleVar (id, pos)) = TODO
           | trvar (A.FieldVar (var, id, pos)) = TODO
           | trvar (A.SubscriptVar (var, exp, pos)) = TODO
+    in
+        trexp
+    end
 
 and transDec ( venv, tenv
              , A.VarDec {name, escape, typ = NONE, init, pos}) =
@@ -150,8 +149,8 @@ and transDec ( venv, tenv
     {tenv = tenv, venv = venv} (* TODO *)
 
 and transDecs (venv, tenv, decls) =
-    case decls of 
-	[] => {venv = venv, tenv = tenv}
+    case decls 
+     of [] => {venv = venv, tenv = tenv}
       | (d::ds) =>
         let
             val {venv = venv', tenv = tenv'} = transDec (venv, tenv, d)
