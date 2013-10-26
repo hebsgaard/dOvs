@@ -14,20 +14,27 @@ structure PT = PrintTypes
 
 val err = ErrorMsg.error
 
+(* Nesting of while- and for- loops, so we know if a break is allowed. *)
+val nesting = ref 0
+fun incNesting() = nesting := !nesting + 1
+fun decNesting() = nesting := !nesting - 1
+					     
+
+
 fun lookupTy tenv sym pos =
     let
         val tyOpt = S.look (tenv, sym)
     in
         Ty.ERROR (* TODO *)
     end
-
+	
 (* NB: Some function names adjusted to use CamelCase more consistently.
  * For example: 'actual_ty' was renamed to 'actualTy' *)
-
+	
 fun actualTy (Ty.NAME (s, ty)) pos =
     Ty.ERROR (* TODO *)
   | actualTy t _ = t
-
+		       
 fun checkInt ({exp, ty}, pos) =
     case ty of
         Ty.INT => ()
@@ -41,7 +48,12 @@ fun checkString ({exp, ty}, pos) =
                   | _ => err pos ("String required" ^ ", " ^
                                  PT.asString ty^ "provided")
 
-fun checkUnit (ty, pos, msg) = err pos "TODO"
+fun checkUnit ({exp, ty}, pos) = 
+    case ty of 
+	Ty.UNIT => ()
+      | Ty.ERROR => ()
+      | _  => err pos ("Unit required, " ^ PT.asString ty ^ " provided")  
+
 
 fun checkAssignable (declared: Ty.ty, assigned: Ty.ty, pos, msg) =
     let
@@ -117,7 +129,18 @@ fun transExp (venv, tenv) =
 			      then {exp = (), ty = #ty thn'}
 			      else {exp = (), ty = Ty.ERROR})
 			 end)
-          | trexp (A.WhileExp {test, body, pos}) = TODO
+          | trexp (A.WhileExp {test, body, pos}) = 
+	    let 
+		val _ = incNesting()
+		val _ = decNesting()
+		val test' = trexp test
+		val body' = trexp body
+	    in
+		(checkInt(test', pos);
+		 checkUnit(body', pos);
+		 {exp = (), ty = Ty.UNIT})
+	    end
+
           | trexp (A.RecordExp {fields, typ, pos}) = TODO
 (*Jeg tænkte at hvis den er tom er det vel en unit?? Eller skal det være NIL?*)
           | trexp (A.SeqExp []) = {exp = (), ty = Ty.UNIT}
@@ -132,26 +155,51 @@ fun transExp (venv, tenv) =
 		then {exp = (), ty = #ty aexp''}
 		else trexp (A.SeqExp aexps')
 	    end
-          | trexp (A.AssignExp {var, exp, pos}) = TODO
-          | trexp (A.ForExp {var, escape, lo, hi, body, pos}) = TODO
-          | trexp (A.BreakExp pos) = TODO
-          | trexp (A.LetExp {decls, body, pos}) =
-	    let
+         | trexp (A.AssignExp {var, exp, pos}) = 
+	   let 
+	       val var' = trvar var
+	       val exp' = trexp exp
+	   in
+	       if #ty var' = #ty exp'
+	       then
+		   {exp = (), ty = Ty.UNIT}
+	       else
+		   (err pos "mismatch of types in assignment"; {exp = (), ty = Ty.ERROR})
+	   end
+         | trexp (A.ForExp {var, escape, lo, hi, body, pos}) = TODO
+         | trexp (A.BreakExp pos) = 
+	   if !nesting > 0
+	   then 
+	       {exp = (), ty = Ty.UNIT}
+	   else
+	       (err pos "break expression not inside while/for loop"; {exp = (), ty = Ty.UNIT})
+		   
+         | trexp (A.LetExp {decls, body, pos}) =
+	   let
                 val {venv=venv', tenv=tenv'} = transDecs (venv, tenv, decls)
-            in
-                transExp (venv', tenv') body
-            end
-          | trexp (A.ArrayExp {typ, size, init, pos}) = TODO
-
+           in
+               transExp (venv', tenv') body
+           end
+         | trexp (A.ArrayExp {typ, size, init, pos}) = 
+	   let
+	       val init' = trexp init
+	       val {exp = (), ty=inittype} = trexp init
+	   in
+	       (checkInt (trexp size, pos);
+		{exp = (), ty = #ty init'})
+	   (* Jeg ved ikke om om man skal checke om vi skal checke typ med et eller andet?
+	    Det er jo et symbol så det vidte jeg ikke lige hvad jeg skulle gøre ved*)
+	   end
+							   
         and trvar (A.SimpleVar (id, pos)) = TODO
           | trvar (A.FieldVar (var, id, pos)) = TODO
           | trvar (A.SubscriptVar (var, exp, pos)) = TODO
     in
         trexp
     end
-
+	
 and transDec ( venv, tenv
-             , A.VarDec {name, escape, typ = NONE, init, pos}) =
+               , A.VarDec {name, escape, typ = NONE, init, pos}) =
     {tenv = tenv, venv = venv} (* TODO *)
 
   | transDec ( venv, tenv
