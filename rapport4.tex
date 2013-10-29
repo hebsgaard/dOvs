@@ -1,0 +1,46 @@
+\documentclass[a4paper,10p,danish]{article}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{amsthm}
+\usepackage{dsfont}
+\usepackage{graphicx}
+\usepackage{verbatim}
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{lem}{Lemma}[section]
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[danish]{babel}
+\usepackage{mathtools}
+\usepackage{stmaryrd}
+\usepackage{mdframed}
+\usepackage{lipsum}
+
+\begin{document}
+\title{Rapport for Semantisk analyse, \\dOvs 2013}
+\date{\today}
+\author{Jakob Ørhøj 20104919\\ Fie Hebsgaard, 20103511 \\ Hannibal Krabbe-Keblovszki 20102295}
+\maketitle
+\thispagestyle{empty}
+\section*{Den semantiske analyse}
+\subsection*{PartA (uden rekursion og break)}
+
+\subsection*{PartB (fuldt funktionel)}
+
+
+\section*{De supplerende moduler}
+I denne aflevering har vi hovedsageligt arbejdet på \textit{semant.sml}-filen, men der har også været en smule arbejde at lave i \textit{env.sml}-filen.
+
+Denne fil består af nogle forskellige base miljøer (base environments). For det første består den af et base type miljø, som er de typer der allerede er predefineret i TIGER, dvs. typerne INT og STRING. 
+
+Vi har udvidet denne fil med de funktioner som allerede er predefineret i TIGER. Filen er implementeret efter Appendix A i bogen, side 519, hvor alle de predefinerede funktioner er opstillet. Her står der både, hvad de gør, hvad de returnerer og hvad de tager med som argumenter. Dette har vi udnyttet til at konstruere resten af \textit{env.sml}-filen. 
+
+Hvis vi fx tager den predefinerede funktion size, så har vi implementeret denne ved først at navngive funktionen og herefter benytte FunEntry til at fortælle, hvilken type argumenterne til funktionen skal være og slutteligt fortælle hvad returværdien skal være.
+
+Dette har vi gjort med alle de andre predefinerede funktioner fra side 519.
+
+\section*{Testcases}
+
+\section*{Fundne problemer og opnået erfaring}
+
+\section*{KONKLUSION!}
+\end{document}
