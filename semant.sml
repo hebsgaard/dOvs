@@ -185,7 +185,6 @@ fun transExp (venv, tenv) =
 	    end
 
           | trexp (A.RecordExp {fields, typ, pos}) = TODO
-(*Jeg tænkte at hvis den er tom er det vel en unit?? Eller skal det være NIL?*)
           | trexp (A.SeqExp []) = {exp = (), ty = Ty.UNIT}
 (*Se godt på mærkerne, tækte om det skal være noget andet end '' i val*)
           | trexp (A.SeqExp (aexps as (aexp'::aexps'))) = 
@@ -238,7 +237,7 @@ fun transExp (venv, tenv) =
 	    let
 		val init' = trexp init
 	    in
-		(checkInt (trexp size, pos);
+ 		(checkInt (trexp size, pos);
 		 {exp = (), ty = #ty init'})
 	    (* Jeg ved ikke om man skal checke om vi skal checke typ med et eller andet?
 	    Det er jo et symbol så det vidte jeg ikke lige hvad jeg skulle gøre ved*)
@@ -251,26 +250,58 @@ fun transExp (venv, tenv) =
 					 {exp = (), ty =Ty.ERROR}) 
 	       | NONE => ((err pos ("undefined variable " ^S.name id));
 			  {exp = (), ty = Ty.INT}))
-          | trvar (A.FieldVar (var, id, pos)) = TODO		 
-          | trvar (A.SubscriptVar (var, exp, pos)) = TODO
+          | trvar (A.FieldVar (var, id, pos)) = 
+	    (case S.look(venv, id) of 
+		 SOME(E.VarEntry {ty}) => TODO
+		(* case ty of
+		     Ty.RECORD (fields, _) => {exp = (), ty = ty}
+		   | _ => ((err pos "Variable is not a record");
+			   {exp =(), ty = Ty.UNIT}) *)
+	  | SOME(E.FunEntry {formals, result}) => TODO
+	       | NONE => ((err pos ("undefined variable " ^S.name id));
+			  {exp = (), ty = Ty.INT}))
+
+          | trvar (A.SubscriptVar (var, exp, pos)) = 
+	    let
+		val exp' = trexp exp
+	    in
+		(checkInt(exp', pos);
+		 {exp = (), ty = Ty.INT})
+	    end
     in
         trexp
     end
 	
-and transDec ( venv, tenv
-               , A.VarDec {name, escape, typ = NONE, init, pos}) =
-    {tenv = tenv, venv = venv} (* TODO *)
+and transDec ( venv, tenv, A.VarDec {name, escape, typ = NONE, init, pos}) =
+    let 
+	val {exp,ty} = (transExp(venv,tenv)) init
+	val venv' = S.enter(venv, name, E.VarEntry{ty=ty})
+    in 
+	{tenv=tenv, venv=venv'}
+    end
 	
-  | transDec ( venv, tenv
-               , A.VarDec {name, escape, typ = SOME (s, pos), init, pos=pos1}) =
-    {tenv = tenv, venv = venv} (* TODO *)
+  | transDec ( venv, tenv, A.VarDec {name, escape, typ = SOME (s, pos), init, pos=pos1}) =
+    let
+	val {exp, ty} = (transExp(venv, tenv)) init
+	val typ' = S.look(tenv, s)
+	val venv' = S.enter(venv, name, E.VarEntry{ty = ty})
+    in
+	((case typ' of 
+	     NONE => err pos "type is not defined in enviroment"
+	  | SOME ty1 => (checkAssignable(ty1, ty, pos1, "type in var dec should be the same"); ()));
+	 {tenv = tenv, venv = venv'})
+    end
 	
   | transDec (venv, tenv, A.TypeDec tydecls) =
-    {tenv = tenv, venv = venv} (* TODO *)
+    let 
+	val [{name, ty, pos}] = tydecls
+	val tenv' = S.enter(tenv, name, transTy(tenv, ty))
+    in
+	{tenv = tenv', venv = venv}
+    end
 	
-  | transDec (venv, tenv, A.FunctionDec fundecls) =
-    {tenv = tenv, venv = venv} (* TODO *)
-	
+  | transDec (venv, tenv, A.FunctionDec fundecls) = {tenv = tenv, venv = venv} (* TO DO *)
+	 
 and transDecs (venv, tenv, decls) =
     case decls of 
 	[] => {venv = venv, tenv = tenv}
