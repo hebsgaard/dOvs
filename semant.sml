@@ -26,17 +26,26 @@ fun lookupTy tenv sym pos =
     in
         case tyOpt of
 	     SOME someType => someType
-	   (* returns a type error so we can move on *)
 	   | NONE => (err pos ("type is not defined in the enviroment: " ^ S.name sym) ; Ty.ERROR)
     end
 	
 (* NB: Some function names adjusted to use CamelCase more consistently.
  * For example: 'actual_ty' was renamed to 'actualTy' *)
+
+fun lookUpFields(id:S.symbol, fields:(S.symbol*Ty.ty) list) =
+    let
+	fun luf (id:S.symbol, []:(S.symbol*Ty.ty) list) = Ty.ERROR
+	  | luf (id, x::xs:(S.symbol*Ty.ty) list) = 
+	    if (id = (#1 x))
+	    then (#2 x)
+	    else luf(id, xs)
+    in
+	luf(id, fields)
+    end
 	
 fun actualTy (Ty.NAME (s, ty)) pos =
     (case !ty of
 	NONE => (err pos "The type is undeclared" ; Ty.ERROR)
-(* why should this be pos????? *)
       | SOME t => actualTy t pos)
   | actualTy t _ = t
 		       
@@ -76,27 +85,31 @@ fun checkAssignable (declared: Ty.ty, assigned: Ty.ty, pos, msg) =
 		 if (u1=u2)
 		 then true
 		 else (err pos ("Mismatch of the record unique ref in: " ^ msg) ; false)
-	       | _ => (err pos ("Mismatch of the types in: " ^ msg) ; false))
+	       | _ => (err pos ("RECORDMismatch of the types in: " ^ msg) ; false))
 	  | Ty.ARRAY(_, u1) =>
 	    (case aAssigned of
 		 Ty.ARRAY(_, u2) => 
 		 if (u1=u2)
 		 then true
 		 else (err pos ("Mismatch of the array unique ref in: " ^ msg) ; false)
-	       | _ => (err pos ("Mismatch of the types in: " ^ msg) ; false)) 
+	       | _ => (err pos ("ARRAYMismatch of the types in: " ^ msg) ; false)) 
 	  | x => 
 	    (*Check all other cases*)
 	    if (x= aAssigned) 
 	    then true 
-	    else (err pos ("Mismatch of the types in: " ^ msg) ; false)
+	    else (err pos ("ERRORMismatch of the types in: " ^ msg) ; false)
     end
 	
 fun transTy (tenv, t) =
     let 
-	(*Translate Absyn recorddata to Type recorddata*)
+	(*Translate Absyn fielddata to Type recorddata*)
 	fun transRecordData [] = []
-	  | transRecordData ({name, escape, typ, pos} :: fieldList) = 
-	  (name, lookupTy tenv name pos):: transRecordData fieldList
+	  | transRecordData ({name, escape, typ, pos} :: fieldList) =
+	    let
+		val (sym, pos1) = typ
+	    in 
+		(name, lookupTy tenv sym pos1):: transRecordData fieldList
+	    end
     in
 	case t of
 	    (*ref (), is a unique ref*)
@@ -157,9 +170,9 @@ fun transExp (venv, tenv) =
                      val test' = trexp test
                      val thn' = trexp thn
                  in
-                     (checkInt(test', pos);
-		      checkUnit(thn', pos);
-                      {exp = (), ty = #ty thn'})
+                     (checkInt(test', pos)
+		     ; checkUnit(thn', pos)
+		     ; {exp = (), ty = #ty thn'})
                  end
 	       | SOME els=> 
 		 let
@@ -184,12 +197,33 @@ fun transExp (venv, tenv) =
 		 {exp = (), ty = Ty.UNIT})
 	    end
 
-          | trexp (A.RecordExp {fields, typ, pos}) = TODO
+          | trexp (A.RecordExp {fields, typ, pos}) = 
+	    let
+		val typ' = S.look(tenv, typ)
+		val fieldNames = map #1 fields
+		val fieldTypes = map #ty (map trexp (map #2 fields))
+	    in
+		(case typ' of
+		     NONE => (err pos "The type is not defined in environment" ; {exp =(), ty=Ty.ERROR})
+		   | SOME ty => 
+		     case ty of 
+			 Ty.RECORD(rfields, u) =>
+			 let
+			     val rFieldNames = map #1 rfields
+			     val rFieldTypes = map (fn t => actualTy t pos) (map #2 rfields)
+			 in
+			     if fieldNames = rFieldNames
+			     then
+				 if fieldTypes = rFieldTypes
+				 then {exp = (), ty = Ty.RECORD(rfields, u)}
+				 else (err pos "The fieldtypes aren't equal" ; {exp = (), ty=Ty.RECORD(rfields, u)})
+			     else (err pos "The ids don't match in record" ; {exp = (), ty=Ty.RECORD(rfields, u)})
+			 end
+		       | _ =>  (err pos ("not a record type" ^ S.name typ); {exp = (), ty = Ty.ERROR}))
+	    end
           | trexp (A.SeqExp []) = {exp = (), ty = Ty.UNIT}
-(*Se godt på mærkerne, tækte om det skal være noget andet end '' i val*)
           | trexp (A.SeqExp (aexps as (aexp'::aexps'))) = 
 	    let
-(*Fordi aexp' er en exp og en pos er bliver man nødt til at dele den op fordi vi kun vil tilgå expressionen. Ved ikke om det giver mening for jer? *)
 		val (e, p) = aexp'
 		val aexp'' = trexp e
 	    in
@@ -202,11 +236,11 @@ fun transExp (venv, tenv) =
 		val var' = trvar var
 		val exp' = trexp exp
 	    in
-		if #ty var' = #ty exp'
+		if checkAssignable(#ty var', #ty exp', pos, "assignable")
 		then
 		    {exp = (), ty = Ty.UNIT}
 		else
-		    (err pos "mismatch of types in assignment"; {exp = (), ty = Ty.ERROR})
+		   {exp = (), ty = Ty.ERROR}
 	    end
           | trexp (A.ForExp {var, escape, lo, hi, body, pos}) = TODO (*
 	    let
@@ -236,37 +270,49 @@ fun transExp (venv, tenv) =
           | trexp (A.ArrayExp {typ, size, init, pos}) = 
 	    let
 		val init' = trexp init
+		val size' = trexp size
+		val typ' = S.look(tenv, typ)
 	    in
- 		(checkInt (trexp size, pos);
-		 {exp = (), ty = #ty init'})
-	    (* Jeg ved ikke om man skal checke om vi skal checke typ med et eller andet?
-	    Det er jo et symbol så det vidte jeg ikke lige hvad jeg skulle gøre ved*)
+ 		(checkInt (size', pos);
+		 case typ' of
+		    NONE => (err pos ("type is not defined for array" ^S.name typ)
+			    ; {exp = (), ty = Ty.UNIT})
+		  | SOME ty1 => {exp = (), ty = ty1})
 	    end
 		
         and trvar (A.SimpleVar (id, pos)) =
 	    (case S.look(venv, id) of 
 		 SOME(E.VarEntry{ty}) => {exp = (), ty = actualTy ty pos}
-	       | SOME(E.FunEntry _) => (err pos "not a simple var"; 
+	       | SOME(E.FunEntry _) => (err pos "not a simple var but a function"; 
 					 {exp = (), ty =Ty.ERROR}) 
 	       | NONE => ((err pos ("undefined variable " ^S.name id));
-			  {exp = (), ty = Ty.INT}))
-          | trvar (A.FieldVar (var, id, pos)) = 
-	    (case S.look(venv, id) of 
-		 SOME(E.VarEntry {ty}) => TODO
-		(* case ty of
-		     Ty.RECORD (fields, _) => {exp = (), ty = ty}
-		   | _ => ((err pos "Variable is not a record");
-			   {exp =(), ty = Ty.UNIT}) *)
-	  | SOME(E.FunEntry {formals, result}) => TODO
-	       | NONE => ((err pos ("undefined variable " ^S.name id));
-			  {exp = (), ty = Ty.INT}))
+			  {exp = (), ty = Ty.UNIT}))
 
+          | trvar (A.FieldVar (var, id, pos)) =
+	    let
+		val var' = trvar var
+	    in
+		(case #ty var' of
+		     Ty.RECORD(fields, _) =>
+		     let 
+			 val luf' = lookUpFields(id, fields)
+		     in
+			 (case luf' of
+			      Ty.ERROR => (err pos "The symbol isn't in the record" ; {exp = (), ty=Ty.ERROR })
+			    | ty1 => {exp = (), ty = ty1})
+		     end
+		   | _ => (err pos "The fieldvar has to be a recordtype" ; {exp = (), ty = Ty.ERROR})) 
+	    end
+		    
           | trvar (A.SubscriptVar (var, exp, pos)) = 
 	    let
 		val exp' = trexp exp
+		val var' = trvar var
 	    in
-		(checkInt(exp', pos);
-		 {exp = (), ty = Ty.INT})
+		(checkInt(exp', pos)
+		; (case #ty var' of
+		       Ty.ARRAY (ty1, _) => {exp = (), ty = ty1}
+		    | _ => (err pos "SubscriptVar isn't an array" ; {exp = (), ty = Ty.ERROR}))) 
 	    end
     in
         trexp
