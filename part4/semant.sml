@@ -162,7 +162,15 @@ fun transExp (venv, tenv) =
                       | _ => {exp = (), ty = Ty.ERROR}  
                 end
             else {exp = (), ty = Ty.ERROR}
-          | trexp (A.CallExp {func, args, pos}) =TODO
+          | trexp (A.CallExp {func, args, pos}) =
+	    (case S.look (venv, func) of 
+		 NONE =>( err pos ("Function doesn't exist in environment: " ^ S.name func); 
+			  {exp =(), ty = Ty.ERROR})
+	       | SOME (E.FunEntry{formals=formals, result=resultTy}) => 
+		 (*IKKE FÆRDIG!!!!!*)
+		 {exp = (), ty = resultTy}
+	       | _  => (err pos "should call a function"; {exp =(), ty = Ty.ERROR}) 
+	    )
           | trexp (A.IfExp {test, thn, els, pos}) =
 	    (case els of 
 		 NONE=> 
@@ -242,18 +250,20 @@ fun transExp (venv, tenv) =
 		else
 		   {exp = (), ty = Ty.ERROR}
 	    end
-          | trexp (A.ForExp {var, escape, lo, hi, body, pos}) = TODO (*
+          | trexp (A.ForExp {var, escape, lo, hi, body, pos}) =
 	    let
-		val lo' = trexp lo
-		val hi' = trexp hi
-		val body' = trexp body
+		val _ = incNesting()
+		val venv' = S.enter(venv, var, E.VarEntry{ty = Ty.INT})
+		val lo' =trexp lo 
+		val hi' =trexp hi
+		val body' = transExp (venv', tenv) body
+		val _ = decNesting()
 	    in
-		(* vi mangler evt. at checke id *)
 		(checkInt(lo', pos);
 		 checkInt(hi', pos);
 		 checkUnit(body', pos);
 		 {exp = (), ty = Ty.UNIT})
-	    end *)
+	    end 
           | trexp (A.BreakExp pos) = 
 	    if !nesting > 0
 	    then 
@@ -346,7 +356,38 @@ and transDec ( venv, tenv, A.VarDec {name, escape, typ = NONE, init, pos}) =
 	{tenv = tenv', venv = venv}
     end
 	
-  | transDec (venv, tenv, A.FunctionDec fundecls) = {tenv = tenv, venv = venv} (* TO DO *)
+  | transDec (venv, tenv, A.FunctionDec fundecls) = 
+   let 
+       val  [{ name: S.symbol
+                       , params: A.fielddata list
+                       , result = SOME (sym, pos1)
+                       , body: A.exp
+                       , pos: A.pos}] = fundecls
+       val resTy = case S.look(tenv, sym) of 
+		       NONE => Ty.UNIT
+		     | SOME ty  => ty 
+       fun paramsTy ({ name: S.symbol
+                       , escape: bool ref
+                       , typ: (S.symbol * A.pos)
+                       , pos: A.pos})= 
+	   let
+	       val typ' = #1 typ
+	   in
+	       case S.look (tenv, typ') of 
+	       NONE => (err pos ("type is not in envirnment: " ^S.name typ'); 
+			{name = name, ty = Ty.ERROR})
+	     | SOME ty=> {name = name, ty = ty}
+	   end
+       val params' = map paramsTy params
+       val venv' = Symbol.enter(venv, name, 
+			  E.FunEntry{formals = map #ty params', result = resTy})
+       fun enterParam ({name, ty}, venv) = 
+           Symbol.enter (venv, name, E.VarEntry{ty=ty})
+       val venv'' = foldr enterParam venv' params'
+   in
+       (transExp (venv'', tenv) body;  
+       {tenv = tenv, venv = venv'})
+   end
 	 
 and transDecs (venv, tenv, decls) =
     case decls of 
