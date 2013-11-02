@@ -163,14 +163,33 @@ fun transExp (venv, tenv) =
                 end
             else {exp = (), ty = Ty.ERROR}
           | trexp (A.CallExp {func, args, pos}) =
-	    (case S.look (venv, func) of 
-		 NONE =>( err pos ("Function doesn't exist in environment: " ^ S.name func); 
-			  {exp =(), ty = Ty.ERROR})
-	       | SOME (E.FunEntry{formals=formals, result=resultTy}) => 
-		 (*IKKE FÆRDIG!!!!!*)
-		 {exp = (), ty = resultTy}
-	       | _  => (err pos "should call a function"; {exp =(), ty = Ty.ERROR}) 
-	    )
+	    let
+		val  args' = map #1 args
+		fun argsMatch (formals, argsExp) = 
+		    let 
+			fun argsTy (formalTy, exp) = 
+			    let
+				val {exp, ty} = trexp exp
+			    in
+				if (formalTy = ty)
+				then ()
+				else err pos ("argument has incorrct type")
+			    end
+		    in
+			if (length (formals) = length(argsExp))
+			then ((map argsTy (ListPair.zip(formals, argsExp)));())
+			else err pos ("Number of arguments in declaration and given is different in: " 
+				      ^ S.name func)
+		    end
+	    in
+		(case S.look (venv, func) of 
+		     NONE =>( err pos ("Function doesn't exist in environment: " ^ S.name func); 
+			      {exp =(), ty = Ty.ERROR})
+		   | SOME(Env.VarEntry _)  => (err pos "Variable is provided, should call a function"; {exp =(), ty = Ty.ERROR}) 
+		   | SOME (E.FunEntry{formals=formals, result=resultTy}) => 
+		     (argsMatch (formals, args');
+		     {exp = (), ty = resultTy}))
+	    end
           | trexp (A.IfExp {test, thn, els, pos}) =
 	    (case els of 
 		 NONE=> 
