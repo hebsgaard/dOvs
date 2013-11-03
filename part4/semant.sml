@@ -120,8 +120,6 @@ fun transTy (tenv, t) =
 				      
 fun transExp (venv, tenv) =
     let
-        val TODO = {exp = (), ty = Ty.ERROR}
-
         fun trexp (A.NilExp) = {exp = (), ty = Ty.NIL}
           | trexp (A.VarExp var) = trvar var
           | trexp (A.IntExp i) = {exp = (), ty = Ty.INT}
