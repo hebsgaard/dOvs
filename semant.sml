@@ -120,8 +120,6 @@ fun transTy (tenv, t) =
 				      
 fun transExp (venv, tenv) =
     let
-        val TODO = {exp = (), ty = Ty.ERROR}
-
         fun trexp (A.NilExp) = {exp = (), ty = Ty.NIL}
           | trexp (A.VarExp var) = trvar var
           | trexp (A.IntExp i) = {exp = (), ty = Ty.INT}
@@ -173,7 +171,7 @@ fun transExp (venv, tenv) =
 			    in
 				if (formalTy = ty)
 				then ()
-				else err pos ("argument has incorrct type")
+				else err pos ("argument has incorrect type")
 			    end
 		    in
 			if (length (formals) = length(argsExp))
@@ -379,16 +377,20 @@ and transDec ( venv, tenv, A.VarDec {name, escape, typ = NONE, init, pos}) =
    let 
        val  [{ name: S.symbol
                        , params: A.fielddata list
-                       , result = SOME (sym, pos1)
+                       , result : (S.symbol * A.pos) option
                        , body: A.exp
                        , pos: A.pos}] = fundecls
-       val resTy = case S.look(tenv, sym) of 
-		       NONE => Ty.UNIT
-		     | SOME ty  => ty 
+       val resTy = 
+	   case result of 
+	       SOME(sym, pos) =>
+	       (case S.look(tenv, sym) of
+		   NONE => (err pos "return type shold be in scope" ; Ty.UNIT )
+		 | SOME ty => ty )
+	     | NONE => Ty.UNIT
        fun paramsTy ({ name: S.symbol
-                       , escape: bool ref
-                       , typ: (S.symbol * A.pos)
-                       , pos: A.pos})= 
+                     , escape: bool ref
+                     , typ: (S.symbol * A.pos)
+                     , pos: A.pos})=
 	   let
 	       val typ' = #1 typ
 	   in
@@ -403,9 +405,11 @@ and transDec ( venv, tenv, A.VarDec {name, escape, typ = NONE, init, pos}) =
        fun enterParam ({name, ty}, venv) = 
            Symbol.enter (venv, name, E.VarEntry{ty=ty})
        val venv'' = foldr enterParam venv' params'
+       val {exp, ty} =  transExp (venv'', tenv) body
    in
-       (transExp (venv'', tenv) body;  
-       {tenv = tenv, venv = venv'})
+       if  ty  = resTy
+       then {tenv = tenv, venv = venv'}
+       else (err pos ("Mismatch in return type") ; {tenv = tenv, venv = venv'})
    end
 	 
 and transDecs (venv, tenv, decls) =
