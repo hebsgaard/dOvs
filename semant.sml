@@ -208,7 +208,7 @@ fun transExp (venv, tenv) =
 		     (checkInt(test', pos);
 		      if (# ty thn' = #ty els')
 		      then {exp = (), ty = #ty thn'}
-		      else {exp = (), ty = Ty.ERROR})
+		      else (err pos "Mismatch of types in then and else" ; {exp = (), ty = Ty.UNIT}))
 		 end)
           | trexp (A.WhileExp {test, body, pos}) = 
 	    let 
