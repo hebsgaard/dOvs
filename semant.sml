@@ -367,15 +367,15 @@ and transDec ( venv, tenv, A.VarDec {name, escape, typ = NONE, init, pos}) =
 	
   | transDec (venv, tenv, A.TypeDec tydecls) =
     (case tydecls of 
-	[] => {tenv = tenv, venv = venv} 
-     | _ => 
-       let 
-	   val {name=sy, ty=ty', pos=pos'} = List.hd tydecls
-	   val tail = List.tl tydecls
-	   val tenv' = S.enter(tenv, sy, transTy(tenv, ty'))
-       in
-	   transDec (venv, tenv', A.TypeDec(tail))
-       end)
+	 [] => {tenv = tenv, venv = venv} 
+       | _ => 
+	 let 
+	     val {name=sy, ty=ty', pos=pos'} = List.hd tydecls
+	     val tail = List.tl tydecls
+	     val tenv' = S.enter(tenv, sy, transTy(tenv, ty'))
+	 in
+	     transDec (venv, tenv', A.TypeDec(tail))
+	 end)
 	
   | transDec (venv, tenv, A.FunctionDec fundecls) = 
     (case fundecls of 
@@ -412,7 +412,7 @@ and transDec ( venv, tenv, A.VarDec {name, escape, typ = NONE, init, pos}) =
 				     E.FunEntry{formals = map #ty params', result = resTy})
 	    fun enterParam ({name, ty}, venv) = 
 		Symbol.enter (venv, name, E.VarEntry{ty=ty})
-	    val venv'' = foldr enterParam venv' params'
+	    val venv'' = foldr enterParam venv params'
 	    val {exp, ty} =  transExp (venv'', tenv) body
 	in
 	    if  ty  = resTy
