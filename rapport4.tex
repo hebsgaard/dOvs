@@ -16,31 +16,37 @@
 \usepackage{lipsum}
 
 \begin{document}
-\title{Rapport for Semantisk analyse, \\dOvs 2013}
+\title{Aflevering 1 \\ Concurrency 2013}
 \date{\today}
-\author{Jakob Ørhøj 20104919\\ Fie Hebsgaard, 20103511 \\ Hannibal Krabbe-Keblovszki 20102295}
+\author{Fie Hebsgaard-Pedersen 20103511 \\ Hannibal Krabbe-Keblovszki 20102295}
 \maketitle
 \thispagestyle{empty}
-\section*{Den semantiske analyse}
-\subsection*{PartA (uden rekursion og break)}
+\section*{Spørgsmål 1}
+Samtidig programmering (concurrent programming) kan være mere brugbart end sekventiel programmering.
 
-\subsection*{PartB (fuldt funktionel)}
+Hvis man tager et helt simpelt eksempel på dette, så kan man udføre et program vha. sekventiel programmering, hvor man først kører en tråd i fem sekunder og herefter kører tråden i 3 sekunder. Dette program vil så tage 8 sekunder i alt.
+
+Dette kan også gøres vha. samtidig programmering, hvor man først starter den ene tråd, som skal køre i 5 sekunder og denne tråd starter så en ny tråd som kører i tre sekunder. Forskellen er nu, at denne tråd kører samtidig med den anden tråd i stedet for efter og dermed har vi opnået at programmet er færdigt efter 5 sekunder i stedet for 8 sekunder. 
+\section*{Spørgsmål 2}
+Ideen bag model-based development er, at man starter med at have en model over et system.  Når man har denne model skal man sikre sig, at det overholder specifikationerne for systemet og derefter kan man evt. eksperimentere med dens opførsel. Når vi så er sikre på at modellen virker, så kan man implementere dette til et rigtigt system, baseret på vores model.
+Fordelen er bl.a. at man kan fange nogle fejl tidligt, hvis man fx ikke kan få sin model til at opføre sig korrekt. Her er fejlene også nemmere at rette i forhold til det implementerede system.
+\section*{Spørgsmål 3}
 
 
-\section*{De supplerende moduler}
-I denne aflevering har vi hovedsageligt arbejdet på \textit{semant.sml}-filen, men der har også været en smule arbejde at lave i \textit{env.sml}-filen.
+\section*{Spørgsmål 4}
+\section*{Spørgsmål 5}
+\section*{Spørgsmål 6}
+\section*{Spørgsmål 7}
+\section*{Spørgsmål 8}
+\section*{Spørgsmål 9}
+\section*{Spørgsmål 10}
 
-Denne fil består af nogle forskellige base miljøer (base environments). For det første består den af et base type miljø, som er de typer der allerede er predefineret i TIGER, dvs. typerne INT og STRING. 
-
-Vi har udvidet denne fil med de funktioner som allerede er predefineret i TIGER. Filen er implementeret efter Appendix A i bogen, side 519, hvor alle de predefinerede funktioner er opstillet. Her står der både, hvad de gør, hvad de returnerer og hvad de tager med som argumenter. Dette har vi udnyttet til at konstruere resten af \textit{env.sml}-filen. 
-
-Hvis vi fx tager den predefinerede funktion size, så har vi implementeret denne ved først at navngive funktionen og herefter benytte FunEntry til at fortælle, hvilken type argumenterne til funktionen skal være og slutteligt fortælle hvad returværdien skal være.
-
-Dette har vi gjort med alle de andre predefinerede funktioner fra side 519.
-
-\section*{Testcases}
-
-\section*{Fundne problemer og opnået erfaring}
-
-\section*{KONKLUSION!}
+What is a conservative abstraction?
+Discuss pros and cons of programming and modeling concurrency independently of specific thread scheduler algorithms.
+The book uses a slightly unusual definition of the words process and thread. What is this definition, and what is the more common meaning of these words?
+What is interference and why is it an undesirable property?
+What does synchronized mean in Java?
+Are there any good uses of the Thread.yield() method?
+Why is the method Thread.stop() deprecated (and what does it mean that a method is deprecated)?
+Explain the relation between the FSP model of OrnamentalGarden and the Java implementation (see Ch.4). In particular, what does each action in the FSP model correspond to in the Java program?
 \end{document}

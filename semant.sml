@@ -366,52 +366,60 @@ and transDec ( venv, tenv, A.VarDec {name, escape, typ = NONE, init, pos}) =
     end
 	
   | transDec (venv, tenv, A.TypeDec tydecls) =
-    let 
-	val [{name, ty, pos}] = tydecls
-	val tenv' = S.enter(tenv, name, transTy(tenv, ty))
-    in
-	{tenv = tenv', venv = venv}
-    end
+    (case tydecls of 
+	[] => {tenv = tenv, venv = venv} 
+     | _ => 
+       let 
+	   val {name=sy, ty=ty', pos=pos'} = List.hd tydecls
+	   val tail = List.tl tydecls
+	   val tenv' = S.enter(tenv, sy, transTy(tenv, ty'))
+       in
+	   transDec (venv, tenv', A.TypeDec(tail))
+       end)
 	
   | transDec (venv, tenv, A.FunctionDec fundecls) = 
-   let 
-       val  [{ name: S.symbol
-                       , params: A.fielddata list
-                       , result : (S.symbol * A.pos) option
-                       , body: A.exp
-                       , pos: A.pos}] = fundecls
-       val resTy = 
-	   case result of 
-	       SOME(sym, pos) =>
-	       (case S.look(tenv, sym) of
-		   NONE => (err pos "return type shold be in scope" ; Ty.UNIT )
-		 | SOME ty => ty )
-	     | NONE => Ty.UNIT
-       fun paramsTy ({ name: S.symbol
-                     , escape: bool ref
-                     , typ: (S.symbol * A.pos)
-                     , pos: A.pos})=
-	   let
-	       val typ' = #1 typ
-	   in
-	       case S.look (tenv, typ') of 
-	       NONE => (err pos ("type is not in envirnment: " ^S.name typ'); 
-			{name = name, ty = Ty.ERROR})
-	     | SOME ty=> {name = name, ty = ty}
-	   end
-       val params' = map paramsTy params
-       val venv' = Symbol.enter(venv, name, 
-			  E.FunEntry{formals = map #ty params', result = resTy})
-       fun enterParam ({name, ty}, venv) = 
-           Symbol.enter (venv, name, E.VarEntry{ty=ty})
-       val venv'' = foldr enterParam venv' params'
-       val {exp, ty} =  transExp (venv'', tenv) body
-   in
-       if  ty  = resTy
-       then {tenv = tenv, venv = venv'}
-       else (err pos ("Mismatch in return type") ; {tenv = tenv, venv = venv'})
-   end
-	 
+    (case fundecls of 
+	 [] => {tenv = tenv, venv = venv}
+      | _ => 
+	let 
+	    val  { name: S.symbol
+                  , params: A.fielddata list
+                  , result : (S.symbol * A.pos) option
+                  , body: A.exp
+                  , pos: A.pos} = List.hd fundecls
+	    val tail = List.tl fundecls
+	    val resTy = 
+		case result of 
+		    SOME(sym, pos) =>
+		    (case S.look(tenv, sym) of
+			 NONE => (err pos "return type shold be in scope" ; Ty.UNIT )
+		       | SOME ty => ty )
+		  | NONE => Ty.UNIT
+	    fun paramsTy ({ name: S.symbol
+			  , escape: bool ref
+			  , typ: (S.symbol * A.pos)
+			  , pos: A.pos})=
+		let
+		    val typ' = #1 typ
+		in
+		    case S.look (tenv, typ') of 
+			NONE => (err pos ("type is not in envirnment: " ^S.name typ'); 
+				 {name = name, ty = Ty.ERROR})
+		      | SOME ty=> {name = name, ty = ty}
+		end
+	    val params' = map paramsTy params
+	    val venv' = Symbol.enter(venv, name, 
+				     E.FunEntry{formals = map #ty params', result = resTy})
+	    fun enterParam ({name, ty}, venv) = 
+		Symbol.enter (venv, name, E.VarEntry{ty=ty})
+	    val venv'' = foldr enterParam venv' params'
+	    val {exp, ty} =  transExp (venv'', tenv) body
+	in
+	    if  ty  = resTy
+	    then transDec (venv', tenv, A.FunctionDec(tail)) 
+	    else (err pos ("Mismatch in return type") ; {tenv = tenv, venv = venv'})
+	end
+    )
 and transDecs (venv, tenv, decls) =
     case decls of 
 	[] => {venv = venv, tenv = tenv}
