@@ -227,20 +227,25 @@ fun transExp (venv, tenv) =
 		(case typ' of
 		     NONE => (err pos "Type not defined" ; {exp =(), ty=Ty.ERROR})
 		   | SOME ty => 
-		     case ty of 
-			 Ty.RECORD(rfields, u) =>
-			 let
-			     val rFieldNames = map #1 rfields
-			     val rFieldTypes = map (fn t => actualTy t pos) (map #2 rfields)
-			 in
-			     if fieldNames = rFieldNames
-			     then
-				 if fieldTypes = rFieldTypes
-				 then {exp = (), ty = Ty.RECORD(rfields, u)}
-				 else (err pos "The fieldtypes do not match" ; {exp = (), ty=Ty.RECORD(rfields, u)})
-			     else (err pos "The IDs do not match in record" ; {exp = (), ty=Ty.RECORD(rfields, u)})
-			 end
-		       | _ =>  (err pos ("Not a record type" ^ S.name typ); {exp = (), ty = Ty.ERROR}))
+		     let 
+			 val realTy = actualTy ty pos
+		     in
+			 (case realTy of 
+			      Ty.RECORD(rfields, u) =>
+			      let
+				  val rFieldNames = map #1 rfields
+				  val rFieldTypes = map (fn t => actualTy t pos) (map #2 rfields)
+			      in
+				  if fieldNames = rFieldNames
+				  then
+				      if fieldTypes = rFieldTypes
+				      then {exp = (), ty = Ty.RECORD(rfields, u)}
+				      else (err pos "The fieldtypes do not match" ; {exp = (), ty=Ty.RECORD(rfields, u)})
+				  else (err pos "The IDs do not match in record" ; {exp = (), ty=Ty.RECORD(rfields, u)})
+			      end
+			    | Ty.NAME(s, t) => ((err pos "Name?"; {exp = (), ty = Ty.ERROR}))
+			    | _ =>  (err pos ("Not a record type " ^ S.name typ); {exp = (), ty = Ty.ERROR}))
+		     end)
 	    end
           | trexp (A.SeqExp []) = {exp = (), ty = Ty.UNIT}
           | trexp (A.SeqExp (aexps as (aexp'::aexps'))) = 
