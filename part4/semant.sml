@@ -26,7 +26,7 @@ fun lookupTy tenv sym pos =
     in
         case tyOpt of
 	     SOME someType => someType
-	   | NONE => (err pos ("Type is not defined in the environment: " ^ S.name sym) ; Ty.ERROR)
+	   | NONE => (err pos ("Type is not defined: " ^ S.name sym) ; Ty.ERROR)
     end
 	
 (* NB: Some function names adjusted to use CamelCase more consistently.
@@ -229,12 +229,24 @@ fun transExp (venv, tenv) =
 			 let
 			     val rFieldNames = map #1 rfields
 			     val rFieldTypes = map (fn t => actualTy t pos) (map #2 rfields)
+			     fun checkFieldTypes (fields, fieldTyp)= 
+				 (case fieldTyp of 
+				      [] => {exp = (), ty = Ty.RECORD(rfields, u)}
+				    | _ => 
+				      let 
+					  val field = List.hd fields
+					  val tail1 =List.tl fields
+					  val fieldty = List.hd fieldTyp
+					  val tail2 = List.tl fieldTyp
+				      in
+					  if field = fieldty orelse field = Ty.NIL
+					  then checkFieldTypes(tail1, tail2)
+					  else (err pos "The fieldtypes do not match" ; {exp = (), ty=Ty.RECORD(rfields, u)}) 
+				      end)
 			 in
 			     if fieldNames = rFieldNames
 			     then
-				 if fieldTypes = rFieldTypes
-				 then {exp = (), ty = Ty.RECORD(rfields, u)}
-				 else (err pos "The fieldtypes do not match" ; {exp = (), ty=Ty.RECORD(rfields, u)})
+				 checkFieldTypes (fieldTypes, rFieldTypes)
 			     else (err pos "The IDs do not match in record" ; {exp = (), ty=Ty.RECORD(rfields, u)})
 
 			 end

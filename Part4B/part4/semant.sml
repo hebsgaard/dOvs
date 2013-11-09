@@ -69,11 +69,9 @@ fun checkUnit ({exp, ty}, pos) =
 		  
 fun checkAssignable (declared: Ty.ty, assigned: Ty.ty, pos, msg) =
     let
-	(* get the type of aDec and aAss so we can use this in 'in' *)
         val aDeclared = actualTy declared pos
         val aAssigned = actualTy assigned pos
     in
-	(*INSANE! Make sure the unique is the same ref in records and arrays*)
         case aDeclared of
 	    Ty.RECORD (_, u1) =>
 	    (case aAssigned of
@@ -82,19 +80,19 @@ fun checkAssignable (declared: Ty.ty, assigned: Ty.ty, pos, msg) =
 		 if (u1=u2)
 		 then true
 		 else (err pos ("Mismatch of the record unique ref in: " ^ msg) ; false)
-	       | _ => (err pos ("RECORD mismatch of the types in: " ^ msg) ; false))
+	       | _ => (err pos ("Mismatch of the types in: " ^ msg) ; false))
 	  | Ty.ARRAY(_, u1) =>
 	    (case aAssigned of
 		 Ty.ARRAY(_, u2) => 
 		 if (u1=u2)
 		 then true
 		 else (err pos ("Mismatch of the array unique ref in: " ^ msg) ; false)
-	       | _ => (err pos ("ARRAY mismatch of the types in: " ^ msg) ; false)) 
+	       | _ => (err pos ("Mismatch of the types in: " ^ msg) ; false)) 
 	  | x => 
 	    (*Check all other cases*)
 	    if (x= aAssigned) 
 	    then true 
-	    else (err pos ("ERROR mismatch of the types in: " ^ msg) ; false)
+	    else (err pos ("Mismatch of the types in: " ^ msg) ; false)
     end
 	
 fun transTy (tenv, t) =
@@ -152,7 +150,7 @@ fun transExp (venv, tenv) =
                                    {exp = (), ty = Ty.INT})
                       | Ty.STRING => (checkString (left', pos);
                                       checkString(right', pos);
-                                      {exp = (), ty = Ty.STRING})
+                                      {exp = (), ty = Ty.INT})
                       | _ => (err pos "Operands must be of type INT or STRING";{exp = (), ty = Ty.ERROR})
                 end
 	    (* This would probably give a syntax error and prevent us from even reaching this point. *)
@@ -235,15 +233,26 @@ fun transExp (venv, tenv) =
 			      let
 				  val rFieldNames = map #1 rfields
 				  val rFieldTypes = map (fn t => actualTy t pos) (map #2 rfields)
+				  fun checkFieldTypes (fields, fieldTyp)= 
+				      (case fieldTyp of 
+					  [] => {exp = (), ty = Ty.RECORD(rfields, u)}
+					| _ => 
+					  let 
+					      val field = List.hd fields
+					      val tail1 =List.tl fields
+					      val fieldty = List.hd fieldTyp
+					      val tail2 = List.tl fieldTyp
+					  in
+					      if field = fieldty orelse field = Ty.NIL
+					      then checkFieldTypes(tail1, tail2)
+					      else (err pos "The fieldtypes do not match" ; {exp = (), ty=Ty.RECORD(rfields, u)}) 
+					  end)
 			      in
 				  if fieldNames = rFieldNames
 				  then
-				      if fieldTypes = rFieldTypes
-				      then {exp = (), ty = Ty.RECORD(rfields, u)}
-				      else (err pos "The fieldtypes do not match" ; {exp = (), ty=Ty.RECORD(rfields, u)})
+				      checkFieldTypes(fieldTypes, rFieldTypes)
 				  else (err pos "The IDs do not match in record" ; {exp = (), ty=Ty.RECORD(rfields, u)})
 			      end
-			    | Ty.NAME(s, t) => ((err pos "Name?"; {exp = (), ty = Ty.ERROR}))
 			    | _ =>  (err pos ("Not a record type " ^ S.name typ); {exp = (), ty = Ty.ERROR}))
 		     end)
 	    end
@@ -302,10 +311,17 @@ fun transExp (venv, tenv) =
 		val typ' = S.look(tenv, typ)
 	    in
  		(checkInt (size', pos);
-		 case typ' of
+		( case typ' of
 		    NONE => (err pos ("Type not defined for array" ^S.name typ)
 			    ; {exp = (), ty = Ty.UNIT})
-		  | SOME ty1 => {exp = (), ty = ty1})
+		   |  SOME ty => 
+		      let
+			  val realTy = actualTy ty pos 
+		      in
+			 ( case realTy of 
+			       Ty.ARRAY(ty', u) => {exp = (), ty = Ty.ARRAY(actualTy ty' pos, u)}
+			    | _ => (err pos "Should be an array type"; {exp = (), ty = Ty.ERROR}))
+		      end))				  
 	    end
 		
         and trvar (A.SimpleVar (id, pos)) =
@@ -339,7 +355,7 @@ fun transExp (venv, tenv) =
 	    in
 		(checkInt(exp', pos)
 		; (case #ty var' of
-		       Ty.ARRAY (ty1, _) => {exp = (), ty = ty1}
+		       Ty.ARRAY (ty1, _) => {exp = (), ty = actualTy ty1 pos}
 		    | _ => (err pos "SubscriptVar is not in an array" ; {exp = (), ty = Ty.ERROR}))) 
 	    end
     in
@@ -349,7 +365,7 @@ fun transExp (venv, tenv) =
 and transDec ( venv, tenv, A.VarDec {name, escape, typ = NONE, init, pos}) =
     let 
 	val {exp,ty} = (transExp(venv,tenv)) init
-	val venv' = S.enter(venv, name, E.VarEntry{ty=ty})
+	val venv' = S.enter(venv, name, E.VarEntry{ty= ty})
     in 
 	{tenv=tenv, venv=venv'}
     end
@@ -358,12 +374,10 @@ and transDec ( venv, tenv, A.VarDec {name, escape, typ = NONE, init, pos}) =
     let
 	val {exp, ty} = (transExp(venv, tenv)) init
 	val typ' = S.look(tenv, s)
-	val venv' = S.enter(venv, name, E.VarEntry{ty = ty})
     in
-	((case typ' of 
-	     NONE => err pos "Type is not defined"
-	  | SOME ty1 => (checkAssignable(ty1, ty, pos1, "Type in var dec should match"); ()));
-	 {tenv = tenv, venv = venv'})
+	(case typ' of 
+	     NONE => (err pos "Type is not defined" ; {tenv = tenv, venv = venv})
+	  | SOME ty1 => (checkAssignable(ty1, ty, pos1, "Type in var dec should match"); {tenv = tenv, venv = S.enter(venv, name, E.VarEntry{ty = actualTy ty pos})}))
     end
 	
   | transDec (venv, tenv, A.TypeDec tydecls) =
@@ -420,14 +434,14 @@ and transDec ( venv, tenv, A.VarDec {name, escape, typ = NONE, init, pos}) =
 		case S.look (tenv, typ') of 
 			     NONE => (err pos ("Type does not exist: " ^S.name typ'); 
 				      {name = name, ty = Ty.ERROR})
-			   | SOME ty=> {name = name, ty = ty}
+			   | SOME ty=> {name = name, ty = actualTy ty pos}
 	    end
 	fun  resTy  (result) = 
 	    case result of 
 		SOME(sym, pos) =>
 		(case S.look(tenv, sym) of
 		     NONE => (err pos "Return type should be in scope" ; Ty.UNIT )
-		   | SOME ty => ty )
+		   | SOME ty => actualTy ty pos)
 	      | NONE => Ty.UNIT
 	fun funDecs (venv1, decls) =
 	    (case decls of
